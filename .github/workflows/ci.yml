@@ -30,6 +30,7 @@ jobs:
       SERVER_API_BASE_URL: http://localhost:4000/api
       SERVER_HEALTH_URL: http://localhost:4000/health
       PDF_CJK_FONT_PATH: /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
+      PDF_CJK_FONT_FACE: NotoSansCJKtc-Regular
 
     steps:
       - name: Check out repository

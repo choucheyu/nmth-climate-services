@@ -73,6 +73,10 @@ type ReportExportLabels = {
 };
 
 type PdfDocumentInstance = InstanceType<typeof PDFDocument>;
+type PdfCjkFont = {
+  path: string;
+  face?: string;
+};
 
 export const REPORT_PDF_CJK_FONT_MARKER = "NMTH_REPORT_PDF_CJK_FONT";
 export const REPORT_PDF_FONT_UNAVAILABLE = "NMTH_REPORT_PDF_FONT_UNAVAILABLE";
@@ -354,8 +358,8 @@ export class ReportsService {
   }
 
   private async toPdf(rows: ReportRow[], metadata: ReportExportMetadata, query: ReportExportRequest, labels: ReportExportLabels): Promise<Buffer> {
-    const cjkFontPath = this.resolveCjkFontPath();
-    if (!cjkFontPath) {
+    const cjkFont = this.resolveCjkFont();
+    if (!cjkFont) {
       throw new BadRequestException({
         message: REPORT_PDF_FONT_UNAVAILABLE,
         code: REPORT_PDF_FONT_UNAVAILABLE
@@ -365,8 +369,8 @@ export class ReportsService {
     const chunks: Buffer[] = [];
     const finished = new Promise<void>((resolve) => doc.on("end", resolve));
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
-    doc.info.Producer = `${REPORT_PDF_CJK_FONT_MARKER}:${cjkFontPath}`;
-    doc.registerFont(PDF_CJK_FONT_NAME, cjkFontPath);
+    doc.info.Producer = `${REPORT_PDF_CJK_FONT_MARKER}:${cjkFont.path}`;
+    doc.registerFont(PDF_CJK_FONT_NAME, cjkFont.path, cjkFont.face);
     doc.font(PDF_CJK_FONT_NAME);
     doc.fontSize(16).text(metadata.title);
     doc.moveDown(0.4);
@@ -519,7 +523,9 @@ export class ReportsService {
     return REPORT_EXPORT_LABELS[isLocale(locale) ? locale : "en"];
   }
 
-  private resolveCjkFontPath(): string | null {
+  private resolveCjkFont(): PdfCjkFont | null {
+    const envFontPath = process.env.PDF_CJK_FONT_PATH?.trim();
+    const envFontFace = process.env.PDF_CJK_FONT_FACE?.trim();
     const candidates = [process.env.PDF_CJK_FONT_PATH, ...PDF_CJK_FONT_FALLBACK_PATHS]
       .map((value) => value?.trim())
       .filter((value): value is string => Boolean(value));
@@ -527,23 +533,31 @@ export class ReportsService {
       if (!existsSync(candidate)) {
         continue;
       }
-      if (this.canLoadPdfFont(candidate)) {
-        return candidate;
+      const face = candidate === envFontPath ? envFontFace : this.defaultCjkFontFace(candidate);
+      if (this.canLoadPdfFont(candidate, face)) {
+        return { path: candidate, face };
       }
     }
     return null;
   }
 
-  private canLoadPdfFont(fontPath: string): boolean {
+  private canLoadPdfFont(fontPath: string, face?: string): boolean {
     try {
       const doc = new PDFDocument({ autoFirstPage: false });
-      doc.registerFont(PDF_CJK_FONT_NAME, fontPath);
+      doc.registerFont(PDF_CJK_FONT_NAME, fontPath, face);
       doc.font(PDF_CJK_FONT_NAME);
       doc.end();
       return true;
     } catch {
       return false;
     }
+  }
+
+  private defaultCjkFontFace(fontPath: string): string | undefined {
+    if (fontPath.endsWith("/NotoSansCJK-Regular.ttc")) {
+      return "NotoSansCJKtc-Regular";
+    }
+    return undefined;
   }
 
   private csvCell(value: unknown): string {
