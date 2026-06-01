@@ -1,0 +1,865 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String                    @id @default(uuid()) @db.Uuid
+  email                String                    @unique
+  name                 String
+  passwordHash         String                    @map("password_hash")
+  locale               String                    @default("zh-TW")
+  enabled              Boolean                   @default(true)
+  roles                UserRole[]
+  accessScope          UserAccessScope?
+  notificationContacts UserNotificationContact[]
+  preferences          UserPreference[]
+  sessions             UserSession[]
+  auditLogs            AuditLog[]
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  updatedAt            DateTime                  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  description String?
+  users       UserRole[]
+  permissions RolePermission[]
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model UserAccessScope {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @unique @map("user_id") @db.Uuid
+  allowedDataProfiles String[] @default([]) @map("allowed_data_profiles")
+  exhibitionIds       String[] @default([]) @map("exhibition_ids")
+  zoneIds             String[] @default([]) @map("zone_ids")
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("user_access_scopes")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserNotificationContact {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  type       String
+  identifier String
+  label      String?
+  enabled    Boolean  @default(true)
+  metadata   Json     @default("{}")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, type])
+  @@index([type, enabled])
+  @@map("user_notification_contacts")
+}
+
+model UserPreference {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  key       String
+  value     Json     @default("{}")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("user_preferences")
+}
+
+model UserSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  ipAddress String?   @map("ip_address")
+  userAgent String?   @map("user_agent")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, expiresAt])
+  @@map("user_sessions")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  riskLevel  String   @default("normal") @map("risk_level")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  before     Json?
+  after      Json?
+  reason     String?
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model NotificationChannel {
+  id               String                 @id @default(uuid()) @db.Uuid
+  type             String
+  name             String
+  enabled          Boolean                @default(false)
+  maskedIdentifier String?                @map("masked_identifier")
+  config           Json                   @default("{}")
+  routes           NotificationRoute[]
+  deliveries       NotificationDelivery[]
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+
+  @@unique([type, name])
+  @@index([type, enabled])
+  @@map("notification_channels")
+}
+
+model NotificationRoute {
+  id         String              @id @default(uuid()) @db.Uuid
+  name       String
+  eventType  String              @map("event_type")
+  level      String?
+  schedule   Json                @default("{}")
+  recipients Json                @default("[]")
+  channelId  String              @map("channel_id") @db.Uuid
+  channel    NotificationChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+
+  @@index([eventType, level])
+  @@map("notification_routes")
+}
+
+model NotificationTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String
+  locale    String
+  subject   String?
+  body      String
+  variables Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([key, locale])
+  @@map("notification_templates")
+}
+
+model NotificationDelivery {
+  id          String              @id @default(uuid()) @db.Uuid
+  channelId   String              @map("channel_id") @db.Uuid
+  alertId     String?             @map("alert_id") @db.Uuid
+  reportJobId String?             @map("report_job_id") @db.Uuid
+  eventType   String              @map("event_type")
+  status      String
+  recipient   String?
+  payload     Json                @default("{}")
+  error       String?
+  retryCount  Int                 @default(0) @map("retry_count")
+  sentAt      DateTime?           @map("sent_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  channel     NotificationChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  alert       Alert?              @relation(fields: [alertId], references: [id], onDelete: SetNull)
+  reportJob   ReportJob?          @relation(fields: [reportJobId], references: [id], onDelete: SetNull)
+
+  @@index([eventType, status])
+  @@index([createdAt])
+  @@map("notification_deliveries")
+}
+
+model DeviceGroup {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  code      String   @unique
+  devices   Device[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("device_groups")
+}
+
+model Device {
+  id                    String                     @id @default(uuid()) @db.Uuid
+  dataProfile           String                     @default("REAL") @map("data_profile")
+  deviceName            String                     @map("device_name")
+  displayName           String                     @map("display_name")
+  ipAddress             String?                    @map("ip_address")
+  macAddress            String?                    @map("mac_address")
+  groupId               String?                    @map("group_id") @db.Uuid
+  exhibitionId          String?                    @map("exhibition_id") @db.Uuid
+  zoneId                String?                    @map("zone_id") @db.Uuid
+  pointType             String                     @default("ambient") @map("point_type")
+  enabled               Boolean                    @default(true)
+  archivedAt            DateTime?                  @map("archived_at")
+  lastSeenAt            DateTime?                  @map("last_seen_at")
+  lastParseStatus       String?                    @map("last_parse_status")
+  metadata              Json                       @default("{}")
+  group                 DeviceGroup?               @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  exhibition            Exhibition?                @relation(fields: [exhibitionId], references: [id], onDelete: SetNull)
+  zone                  ExhibitionZone?            @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  rawPackets            DeviceRawPacket[]
+  measurements          Measurement[]
+  statusEvents          DeviceStatusEvent[]
+  calibrations          DeviceCalibration[]
+  maintenanceLogs       DeviceMaintenanceLog[]
+  replacedByHistory     DeviceReplacementHistory[] @relation("ReplacementOld")
+  replacementForHistory DeviceReplacementHistory[] @relation("ReplacementNew")
+  floorPlanPoints       FloorPlanPoint[]
+  thresholdAssignments  ThresholdAssignment[]
+  alerts                Alert[]
+  createdAt             DateTime                   @default(now()) @map("created_at")
+  updatedAt             DateTime                   @updatedAt @map("updated_at")
+
+  @@unique([dataProfile, deviceName])
+  @@index([dataProfile])
+  @@index([exhibitionId, zoneId])
+  @@index([lastSeenAt])
+  @@map("devices")
+}
+
+model DeviceStatusEvent {
+  id        String    @id @default(uuid()) @db.Uuid
+  deviceId  String    @map("device_id") @db.Uuid
+  status    String
+  reason    String?
+  startedAt DateTime  @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+  metadata  Json      @default("{}")
+  device    Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([deviceId, startedAt])
+  @@map("device_status_events")
+}
+
+model DeviceCalibration {
+  id             String    @id @default(uuid()) @db.Uuid
+  deviceId       String    @map("device_id") @db.Uuid
+  calibratedAt   DateTime  @map("calibrated_at")
+  validUntil     DateTime? @map("valid_until")
+  certificateUrl String?   @map("certificate_url")
+  note           String?
+  device         Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([deviceId, calibratedAt])
+  @@map("device_calibrations")
+}
+
+model DeviceMaintenanceLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  deviceId    String   @map("device_id") @db.Uuid
+  type        String
+  note        String?
+  performedBy String?  @map("performed_by")
+  performedAt DateTime @map("performed_at")
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([deviceId, performedAt])
+  @@map("device_maintenance_logs")
+}
+
+model DeviceReplacementHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  oldDeviceId String   @map("old_device_id") @db.Uuid
+  newDeviceId String   @map("new_device_id") @db.Uuid
+  replacedAt  DateTime @map("replaced_at")
+  reason      String?
+  oldDevice   Device   @relation("ReplacementOld", fields: [oldDeviceId], references: [id], onDelete: Cascade)
+  newDevice   Device   @relation("ReplacementNew", fields: [newDeviceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([oldDeviceId, replacedAt])
+  @@map("device_replacement_history")
+}
+
+model DeviceRawPacket {
+  id           String   @default(uuid()) @db.Uuid
+  receivedAt   DateTime @default(now()) @map("received_at")
+  deviceId     String   @map("device_id") @db.Uuid
+  registration String
+  protocol     String
+  frameHex     String?  @map("frame_hex")
+  payload      Json     @default("{}")
+  parseVersion String   @map("parse_version")
+  parseStatus  String   @default("parsed") @map("parse_status")
+  parseError   String?  @map("parse_error")
+  device       Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@id([id, receivedAt])
+  @@index([deviceId, receivedAt])
+  @@map("device_raw_packets")
+}
+
+model IngestQuarantine {
+  id           String   @id @default(uuid()) @db.Uuid
+  receivedAt   DateTime @default(now()) @map("received_at")
+  dataProfile  String   @map("data_profile")
+  registration String
+  protocol     String
+  frameHex     String?  @map("frame_hex")
+  payload      Json     @default("{}")
+  parsed       Json     @default("{}")
+  parseVersion String   @map("parse_version")
+  source       String   @default("real")
+  reason       String
+  status       String   @default("pending")
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([dataProfile, registration, receivedAt])
+  @@index([reason, status, receivedAt])
+  @@map("ingest_quarantine")
+}
+
+model Measurement {
+  id                  String                 @default(uuid()) @db.Uuid
+  measuredAt          DateTime               @map("measured_at")
+  dataProfile         String                 @default("REAL") @map("data_profile")
+  deviceId            String                 @map("device_id") @db.Uuid
+  exhibitionId        String?                @map("exhibition_id") @db.Uuid
+  zoneId              String?                @map("zone_id") @db.Uuid
+  source              String                 @default("real")
+  temperatureC        Float                  @map("temperature_c")
+  humidityPercent     Float                  @map("humidity_percent")
+  dehumidifySetpoint  Float?                 @map("dehumidify_setpoint")
+  qualityFlags        Json                   @default("[]") @map("quality_flags")
+  parseVersion        String                 @map("parse_version")
+  rawPacketId         String?                @map("raw_packet_id") @db.Uuid
+  rawPacketReceivedAt DateTime?              @map("raw_packet_received_at")
+  operatorUserId      String?                @map("operator_user_id") @db.Uuid
+  adjustmentId        String?                @map("adjustment_id") @db.Uuid
+  reason              String?
+  method              String?
+  metadata            Json                   @default("{}")
+  device              Device                 @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  exhibition          Exhibition?            @relation(fields: [exhibitionId], references: [id], onDelete: SetNull)
+  zone                ExhibitionZone?        @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  adjustment          MeasurementAdjustment? @relation(fields: [adjustmentId], references: [id], onDelete: SetNull)
+  createdAt           DateTime               @default(now()) @map("created_at")
+
+  @@id([id, measuredAt])
+  @@unique([deviceId, measuredAt, dataProfile, source, parseVersion])
+  @@index([dataProfile, measuredAt])
+  @@index([deviceId, measuredAt])
+  @@index([exhibitionId, measuredAt])
+  @@index([source, measuredAt])
+  @@map("measurements")
+}
+
+model Exhibition {
+  id                   String                @id @default(uuid()) @db.Uuid
+  dataProfile          String                @default("REAL") @map("data_profile")
+  code                 String
+  name                 String
+  status               String                @default("planned")
+  startDate            DateTime?             @map("start_date")
+  endDate              DateTime?             @map("end_date")
+  owner                String?
+  preservationGoal     String?               @map("preservation_goal")
+  archivedAt           DateTime?             @map("archived_at")
+  zones                ExhibitionZone[]
+  devices              Device[]
+  floorPlans           FloorPlan[]
+  thresholdAssignments ThresholdAssignment[]
+  reports              Report[]
+  reportJobs           ReportJob[]
+  aiReportJobs         AiReportJob[]
+  measurements         Measurement[]
+  alerts               Alert[]
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+
+  @@unique([dataProfile, code])
+  @@index([dataProfile, status])
+  @@index([status])
+  @@map("exhibitions")
+}
+
+model ExhibitionZone {
+  id                   String                @id @default(uuid()) @db.Uuid
+  exhibitionId         String                @map("exhibition_id") @db.Uuid
+  name                 String
+  code                 String
+  description          String?
+  archivedAt           DateTime?             @map("archived_at")
+  exhibition           Exhibition            @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+  devices              Device[]
+  floorPlanPoints      FloorPlanPoint[]
+  thresholdAssignments ThresholdAssignment[]
+  measurements         Measurement[]
+  alerts               Alert[]
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+
+  @@unique([exhibitionId, code])
+  @@map("exhibition_zones")
+}
+
+model FloorPlan {
+  id              String             @id @default(uuid()) @db.Uuid
+  dataProfile     String             @default("REAL") @map("data_profile")
+  exhibitionId    String             @map("exhibition_id") @db.Uuid
+  name            String
+  activeVersionId String?            @map("active_version_id") @db.Uuid
+  archivedAt      DateTime?          @map("archived_at")
+  exhibition      Exhibition         @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+  versions        FloorPlanVersion[]
+  points          FloorPlanPoint[]
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  @@index([dataProfile])
+  @@index([exhibitionId])
+  @@index([archivedAt])
+  @@map("floor_plans")
+}
+
+model FloorPlanVersion {
+  id                String           @id @default(uuid()) @db.Uuid
+  floorPlanId       String           @map("floor_plan_id") @db.Uuid
+  version           Int
+  pdfOriginalPath   String           @map("pdf_original_path")
+  renderedImagePath String?          @map("rendered_image_path")
+  pageNumber        Int              @default(1) @map("page_number")
+  width             Int?
+  height            Int?
+  renderScale       Float            @default(1) @map("render_scale")
+  createdByUserId   String?          @map("created_by_user_id") @db.Uuid
+  archivedAt        DateTime?        @map("archived_at")
+  floorPlan         FloorPlan        @relation(fields: [floorPlanId], references: [id], onDelete: Cascade)
+  points            FloorPlanPoint[]
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  @@unique([floorPlanId, version])
+  @@index([archivedAt])
+  @@map("floor_plan_versions")
+}
+
+model FloorPlanPoint {
+  id                 String            @id @default(uuid()) @db.Uuid
+  floorPlanId        String            @map("floor_plan_id") @db.Uuid
+  versionId          String?           @map("version_id") @db.Uuid
+  zoneId             String?           @map("zone_id") @db.Uuid
+  deviceId           String?           @map("device_id") @db.Uuid
+  name               String
+  xRatio             Float             @map("x_ratio")
+  yRatio             Float             @map("y_ratio")
+  displayStyle       Json              @default("{}") @map("display_style")
+  thresholdProfileId String?           @map("threshold_profile_id") @db.Uuid
+  archivedAt         DateTime?         @map("archived_at")
+  floorPlan          FloorPlan         @relation(fields: [floorPlanId], references: [id], onDelete: Cascade)
+  version            FloorPlanVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  zone               ExhibitionZone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  device             Device?           @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  thresholdProfile   ThresholdProfile? @relation(fields: [thresholdProfileId], references: [id], onDelete: SetNull)
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  @@index([floorPlanId, versionId])
+  @@index([archivedAt])
+  @@map("floor_plan_points")
+}
+
+model ThresholdProfile {
+  id                        String                @id @default(uuid()) @db.Uuid
+  name                      String
+  description               String?
+  warningTemperatureMin     Float?                @default(18) @map("warning_temperature_min")
+  warningTemperatureMax     Float?                @default(25) @map("warning_temperature_max")
+  criticalTemperatureMin    Float?                @map("critical_temperature_min")
+  criticalTemperatureMax    Float?                @map("critical_temperature_max")
+  warningHumidityMin        Float?                @default(50) @map("warning_humidity_min")
+  warningHumidityMax        Float?                @default(60) @map("warning_humidity_max")
+  criticalHumidityMin       Float?                @map("critical_humidity_min")
+  criticalHumidityMax       Float?                @map("critical_humidity_max")
+  triggerDurationMinutes    Int                   @default(10) @map("trigger_duration_minutes")
+  recoveryDurationMinutes   Int                   @default(10) @map("recovery_duration_minutes")
+  hysteresis                Float                 @default(1.0)
+  repeatIntervalMinutes     Int                   @default(60) @map("repeat_interval_minutes")
+  maxNotifications          Int                   @default(3) @map("max_notifications")
+  unresolvedReminderMinutes Int                   @default(1440) @map("unresolved_reminder_minutes")
+  assignments               ThresholdAssignment[]
+  floorPlanPoints           FloorPlanPoint[]
+  createdAt                 DateTime              @default(now()) @map("created_at")
+  updatedAt                 DateTime              @updatedAt @map("updated_at")
+
+  @@map("threshold_profiles")
+}
+
+model ThresholdAssignment {
+  id           String           @id @default(uuid()) @db.Uuid
+  profileId    String           @map("profile_id") @db.Uuid
+  exhibitionId String?          @map("exhibition_id") @db.Uuid
+  zoneId       String?          @map("zone_id") @db.Uuid
+  deviceId     String?          @map("device_id") @db.Uuid
+  priority     Int              @default(100)
+  activeFrom   DateTime?        @map("active_from")
+  activeUntil  DateTime?        @map("active_until")
+  profile      ThresholdProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  exhibition   Exhibition?      @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+  zone         ExhibitionZone?  @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  device       Device?          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  @@index([exhibitionId, zoneId, deviceId])
+  @@map("threshold_assignments")
+}
+
+model Alert {
+  id               String                 @id @default(uuid()) @db.Uuid
+  dataProfile      String                 @default("REAL") @map("data_profile")
+  exhibitionId     String?                @map("exhibition_id") @db.Uuid
+  zoneId           String?                @map("zone_id") @db.Uuid
+  deviceId         String?                @map("device_id") @db.Uuid
+  type             String
+  level            String
+  status           String                 @default("active")
+  title            String
+  message          String
+  triggeredAt      DateTime               @map("triggered_at")
+  resolvedAt       DateTime?              @map("resolved_at")
+  lastNotifiedAt   DateTime?              @map("last_notified_at")
+  metadata         Json                   @default("{}")
+  exhibition       Exhibition?            @relation(fields: [exhibitionId], references: [id], onDelete: SetNull)
+  zone             ExhibitionZone?        @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  device           Device?                @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  events           AlertEvent[]
+  notifications    AlertNotification[]
+  acknowledgements AlertAcknowledgement[]
+  deliveries       NotificationDelivery[]
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+
+  @@index([dataProfile, status, level, triggeredAt])
+  @@index([status, level, triggeredAt])
+  @@index([deviceId, triggeredAt])
+  @@map("alerts")
+}
+
+model AlertEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  alertId   String   @map("alert_id") @db.Uuid
+  eventType String   @map("event_type")
+  level     String?
+  message   String?
+  payload   Json     @default("{}")
+  alert     Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([alertId, createdAt])
+  @@map("alert_events")
+}
+
+model AlertNotification {
+  id        String    @id @default(uuid()) @db.Uuid
+  alertId   String    @map("alert_id") @db.Uuid
+  channel   String
+  status    String
+  sentAt    DateTime? @map("sent_at")
+  payload   Json      @default("{}")
+  alert     Alert     @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([alertId, status])
+  @@map("alert_notifications")
+}
+
+model AlertAcknowledgement {
+  id        String   @id @default(uuid()) @db.Uuid
+  alertId   String   @map("alert_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  note      String?
+  alert     Alert    @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([alertId, createdAt])
+  @@map("alert_acknowledgements")
+}
+
+model AlertEscalationPolicy {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  enabled   Boolean  @default(true)
+  rules     Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("alert_escalation_policies")
+}
+
+model AlertSilenceWindow {
+  id              String   @id @default(uuid()) @db.Uuid
+  scope           String
+  scopeId         String?  @map("scope_id")
+  startsAt        DateTime @map("starts_at")
+  endsAt          DateTime @map("ends_at")
+  reason          String
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([scope, scopeId, startsAt, endsAt])
+  @@map("alert_silence_windows")
+}
+
+model Report {
+  id           String         @id @default(uuid()) @db.Uuid
+  exhibitionId String?        @map("exhibition_id") @db.Uuid
+  title        String
+  description  String?
+  parameters   Json           @default("{}")
+  exhibition   Exhibition?    @relation(fields: [exhibitionId], references: [id], onDelete: SetNull)
+  jobs         ReportJob[]
+  exports      ReportExport[]
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  @@map("reports")
+}
+
+model ReportJob {
+  id           String                 @id @default(uuid()) @db.Uuid
+  reportId     String?                @map("report_id") @db.Uuid
+  exhibitionId String?                @map("exhibition_id") @db.Uuid
+  type         String
+  status       String                 @default("queued")
+  parameters   Json                   @default("{}")
+  result       Json?
+  error        String?
+  startedAt    DateTime?              @map("started_at")
+  completedAt  DateTime?              @map("completed_at")
+  report       Report?                @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  exhibition   Exhibition?            @relation(fields: [exhibitionId], references: [id], onDelete: SetNull)
+  exports      ReportExport[]
+  deliveries   NotificationDelivery[]
+  createdAt    DateTime               @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@map("report_jobs")
+}
+
+model ReportExport {
+  id              String     @id @default(uuid()) @db.Uuid
+  reportId        String?    @map("report_id") @db.Uuid
+  reportJobId     String?    @map("report_job_id") @db.Uuid
+  format          String
+  filePath        String     @map("file_path")
+  fileSize        Int?       @map("file_size")
+  createdByUserId String?    @map("created_by_user_id") @db.Uuid
+  report          Report?    @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  reportJob       ReportJob? @relation(fields: [reportJobId], references: [id], onDelete: SetNull)
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("report_exports")
+}
+
+model ScheduledReport {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  enabled    Boolean  @default(true)
+  cron       String
+  locale     String   @default("zh-TW")
+  parameters Json     @default("{}")
+  recipients Json     @default("[]")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("scheduled_reports")
+}
+
+model WeatherStation {
+  id           String               @id @default(uuid()) @db.Uuid
+  provider     String
+  stationCode  String               @map("station_code")
+  name         String
+  latitude     Float?
+  longitude    Float?
+  enabled      Boolean              @default(true)
+  observations WeatherObservation[]
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+
+  @@unique([provider, stationCode])
+  @@map("weather_stations")
+}
+
+model WeatherObservation {
+  id              String         @id @default(uuid()) @db.Uuid
+  stationId       String         @map("station_id") @db.Uuid
+  observedAt      DateTime       @map("observed_at")
+  temperatureC    Float?         @map("temperature_c")
+  humidityPercent Float?         @map("humidity_percent")
+  rainfallMm      Float?         @map("rainfall_mm")
+  windSpeed       Float?         @map("wind_speed")
+  payload         Json           @default("{}")
+  station         WeatherStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  @@unique([stationId, observedAt])
+  @@index([observedAt])
+  @@map("weather_observations")
+}
+
+model MeasurementAdjustment {
+  id             String        @id @default(uuid()) @db.Uuid
+  type           String
+  method         String
+  reason         String
+  parameters     Json          @default("{}")
+  sourceRange    Json          @default("{}") @map("source_range")
+  operatorUserId String?       @map("operator_user_id") @db.Uuid
+  auditLogId     String?       @map("audit_log_id") @db.Uuid
+  measurements   Measurement[]
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([type, createdAt])
+  @@map("measurement_adjustments")
+}
+
+model AiReportJob {
+  id           String             @id @default(uuid()) @db.Uuid
+  exhibitionId String             @map("exhibition_id") @db.Uuid
+  month        String
+  provider     String             @default("deterministic")
+  status       String             @default("queued")
+  parameters   Json               @default("{}")
+  exhibition   Exhibition         @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+  outputs      AiReportOutput[]
+  evidence     AiReportEvidence[]
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  @@unique([exhibitionId, month, provider])
+  @@map("ai_report_jobs")
+}
+
+model AiReportOutput {
+  id        String      @id @default(uuid()) @db.Uuid
+  jobId     String      @map("job_id") @db.Uuid
+  locale    String      @default("zh-TW")
+  summary   String
+  content   Json        @default("{}")
+  job       AiReportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@unique([jobId, locale])
+  @@map("ai_report_outputs")
+}
+
+model AiReportEvidence {
+  id        String      @id @default(uuid()) @db.Uuid
+  jobId     String      @map("job_id") @db.Uuid
+  key       String
+  label     String
+  value     Json        @default("{}")
+  job       AiReportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@index([jobId, key])
+  @@map("ai_report_evidence")
+}
+
+model SystemSetting {
+  id              String   @id @default(uuid()) @db.Uuid
+  key             String   @unique
+  value           Json     @default("{}")
+  updatedByUserId String?  @map("updated_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+model DataRetentionPolicy {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String
+  rawPacketDays    Int      @default(3650) @map("raw_packet_days")
+  measurementDays  Int      @default(3650) @map("measurement_days")
+  reportExportDays Int      @default(1095) @map("report_export_days")
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("data_retention_policies")
+}
+
+model BackupJob {
+  id          String    @id @default(uuid()) @db.Uuid
+  type        String
+  status      String
+  target      String?
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  error       String?
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@map("backup_jobs")
+}
+
+model I18nMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  locale    String
+  key       String
+  value     String
+  namespace String   @default("app")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([locale, key])
+  @@map("i18n_messages")
+}

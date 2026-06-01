@@ -1,0 +1,2 @@
+ALTER TABLE "floor_plan_versions"
+ADD COLUMN "render_scale" DOUBLE PRECISION NOT NULL DEFAULT 1;
