@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { FloorPlansService } from "./floor-plans.service";
 
@@ -232,8 +233,10 @@ describe("FloorPlansService", () => {
         ...makeFloorPlan(),
         versions: [
           makeVersion({
-            renderedImagePath:
-              "/tmp/nmth-exhibition-climate-monitor/apps/api/uploads/floor-plans/rendered/floor-plan-version-version-1-hash.png",
+            renderedImagePath: resolve(
+              process.cwd(),
+              "uploads/floor-plans/rendered/floor-plan-version-version-1-hash.png",
+            ),
           }),
         ],
       },

@@ -128,12 +128,32 @@ Responsive UI checks:
 pnpm test:responsive
 ```
 
+## Open Source Project Files
+
+This repository includes the baseline governance files expected for a public
+open source project:
+
+- `LICENSE` - MIT license for source code reuse.
+- `SECURITY.md` - Vulnerability reporting expectations and safe disclosure
+  guidance.
+- `CONTRIBUTING.md` - Local setup, verification, PR, and data-safety
+  guidelines.
+- `CODE_OF_CONDUCT.md` - Contributor behavior expectations.
+- `.github/ISSUE_TEMPLATE/` - Bug report and feature request templates.
+- `.github/pull_request_template.md` - PR review checklist.
+- `.github/workflows/ci.yml` - CI checks for install, Prisma client
+  generation, typecheck, lint, and unit tests.
+
 ## Security Notes
 
 - `.env.example` contains only empty placeholders in this export.
 - Keep database credentials, ingest tokens, notification tokens, API keys, and webhook URLs out of git.
 - Keep production deployment files private unless they are reviewed and sanitized.
 - Do not expose the API or dashboard publicly without authentication, rate limiting, CSRF, origin, and reverse-proxy review.
+
+## License
+
+This project is released under the MIT License. See `LICENSE`.
 
 ## Related Repositories
 

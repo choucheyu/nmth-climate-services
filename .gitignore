@@ -34,7 +34,6 @@ redis-data/
 docs/
 memory/
 backups/
-.github/
 .githooks/
 docker-compose.yml
 .env
