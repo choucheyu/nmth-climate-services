@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   verify:
     name: Typecheck, lint, and tests
@@ -26,6 +29,7 @@ jobs:
       INGEST_API_TOKEN: ci-ingest-token-placeholder
       SERVER_API_BASE_URL: http://localhost:4000/api
       SERVER_HEALTH_URL: http://localhost:4000/health
+      PDF_CJK_FONT_PATH: /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
 
     steps:
       - name: Check out repository
@@ -44,6 +48,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Install CJK font for PDF tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
 
       - name: Generate Prisma client
         run: pnpm db:generate

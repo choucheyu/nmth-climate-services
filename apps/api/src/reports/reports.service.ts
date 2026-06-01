@@ -84,6 +84,9 @@ const REPORT_MAX_SYNC_EXPORT_ROWS = 50_000;
 const REPORT_MAX_SYNC_PDF_ROWS = 2_000;
 const REPORT_MAX_CHART_IMAGE_BYTES = 4 * 1024 * 1024;
 const PDF_CJK_FONT_FALLBACK_PATHS = [
+  "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+  "/usr/share/fonts/opentype/noto/NotoSansCJK-TC-Regular.otf",
+  "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
   "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/eb257c12d1a51c8c661b89f30eec56cacf9b8987.asset/AssetData/STHEITI.ttf",
   "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/3a9dbc8ddc8b85f43055a28fb5d551e905d43de2.asset/AssetData/LiHeiPro.ttf",
   "/System/Library/AssetsV2/com_apple_MobileAsset_Font7/62032b9b64a0e3a9121c50aeb2ed794e3e2c201f.asset/AssetData/Hei.ttf"
