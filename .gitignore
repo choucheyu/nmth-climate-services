@@ -32,7 +32,6 @@ redis-data/
 
 # Sanitized GitHub export guardrails
 docs/
-README.md
 memory/
 backups/
 .github/
